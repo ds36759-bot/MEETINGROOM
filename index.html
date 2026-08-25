@@ -678,8 +678,8 @@ function updateAccountButton(){
   const btn=document.getElementById("accountBtn");
   if(!btn)return;
   const label=btn.querySelector(".account-label");
-  if(label)label.textContent=currentUser?(currentUser.email||"Кабінет"):"Кабінет";
-  btn.title=currentUser?`Власний кабінет: ${currentUser.email}`:"Увійти або зареєструватися";
+  if(label)label.textContent=currentUser?("@"+(currentUser.login||"Кабінет")):"Кабінет";
+  btn.title=currentUser?`Власний кабінет: @${currentUser.login||""}`:"Увійти або зареєструватися";
   const historyBtn=document.getElementById("historyBtn");
   if(historyBtn)historyBtn.style.display=currentUser?"flex":"none";
   if(!currentUser){const badge=document.getElementById("messageBadge");if(badge)badge.hidden=true;}
@@ -741,23 +741,19 @@ function renderAuthModal(mode="login"){
       <button class="auth-tab ${isRegister?"active":""}" type="button" onclick="renderAuthModal('register')">Реєстрація</button>
     </div>
     <div class="account-form">
-      <label>E-mail</label>
-      <input id="authEmail" type="email" autocomplete="email" placeholder="name@company.com">
+      ${isRegister?`<label>Логін</label><input id="authLogin" type="text" autocomplete="username" maxlength="32" placeholder="напр. natalia.k"><div class="reset-note">Логін бачать інші користувачі в розкладі. 3–32 символи: латиниця, цифри, . _ -</div><label>E-mail</label><input id="authEmail" type="email" autocomplete="email" placeholder="name@company.com"><div class="reset-note">E-mail не показується іншим користувачам — він потрібен лише для відновлення пароля та сповіщень.</div>`:`<label>Логін або e-mail</label><input id="authIdentity" type="text" autocomplete="username" placeholder="логін або name@company.com">`}
       <label>Пароль</label>
       <input id="authPassword" type="password" autocomplete="${isRegister?"new-password":"current-password"}" placeholder="Мінімум 8 символів">
       ${!isRegister?`<div class="forgot-row"><button class="forgot-link" type="button" onclick="renderForgotPasswordModal()">Забули пароль?</button></div>`:""}
       ${isRegister?`<label>Повторіть пароль</label><input id="authPassword2" type="password" autocomplete="new-password" placeholder="Повторіть пароль">`:""}
       <div class="account-error" id="accountError"></div>
-      <div class="account-actions">
-        <button type="button" onclick="closeModal()">Скасувати</button>
-        <button class="primary" id="authSubmit" type="button" onclick="${isRegister?"submitRegister()":"submitLogin()"}">${isRegister?"Зареєструватися":"Увійти"}</button>
-      </div>
+      <div class="account-actions"><button type="button" onclick="closeModal()">Скасувати</button><button class="primary" id="authSubmit" type="button" onclick="${isRegister?"submitRegister()":"submitLogin()"}">${isRegister?"Зареєструватися":"Увійти"}</button></div>
     </div>`;
-  modalShell(isRegister?"Створення кабінету":"Вхід у кабінет",isRegister?"E-mail стане вашим логіном":"Увійдіть за e-mail і паролем",body);
-  const email=document.getElementById("authEmail");
-  if(email)email.focus();
+  modalShell(isRegister?"Створення кабінету":"Вхід у кабінет",isRegister?"Окремий публічний логін + приватний e-mail":"Увійдіть за логіном або e-mail",body);
+  const first=document.getElementById(isRegister?"authLogin":"authIdentity");if(first)first.focus();
+  if(isRegister){const em=document.getElementById("authEmail"), lg=document.getElementById("authLogin");if(em&&lg)em.addEventListener("blur",()=>{if(!lg.value.trim())lg.value=suggestLoginFromEmail(em.value);});}
   const handler=ev=>{if(ev.key==="Enter"){isRegister?submitRegister():submitLogin();}};
-  ["authEmail","authPassword","authPassword2"].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener("keydown",handler)});
+  ["authLogin","authEmail","authIdentity","authPassword","authPassword2"].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener("keydown",handler)});
 }
 
 function setAccountError(text){
@@ -768,36 +764,38 @@ function setAuthBusy(busy){
   const btn=document.getElementById("authSubmit");if(btn){btn.disabled=busy;btn.style.opacity=busy?".65":"1";}
 }
 
+function suggestLoginFromEmail(email){
+  return String(email||"").trim().toLowerCase().split("@")[0].replace(/[^a-z0-9._-]/g,"").slice(0,32);
+}
+
 async function submitRegister(){
+  const login=(document.getElementById("authLogin")?.value||"").trim().toLowerCase();
   const email=(document.getElementById("authEmail")?.value||"").trim();
   const password=document.getElementById("authPassword")?.value||"";
   const password2=document.getElementById("authPassword2")?.value||"";
+  if(!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(login)){setAccountError("Логін: 3–32 символи, латиниця, цифри, . _ -");return;}
   if(!email){setAccountError("Вкажіть e-mail.");return;}
   if(password.length<8){setAccountError("Пароль має містити щонайменше 8 символів.");return;}
   if(password!==password2){setAccountError("Паролі не збігаються.");return;}
   setAccountError("");setAuthBusy(true);
   try{
-    const result=await accountApi("register",{email,password});
+    const result=await accountApi("register",{login,email,password});
     if(!result.ok)throw new Error(result.error||"Не вдалося зареєструватися");
-    sessionToken=result.token||"";currentUser=result.user||null;
-    localStorage.setItem("bookingSessionToken",sessionToken);
-    if(currentUser?.theme)applyTheme(currentUser.theme);
-    updateAccountButton();refreshMessageBadge();renderAccountCabinet();
+    sessionToken=result.token||"";currentUser=result.user||null;localStorage.setItem("bookingSessionToken",sessionToken);
+    if(currentUser?.theme)applyTheme(currentUser.theme);updateAccountButton();refreshMessageBadge();renderAccountCabinet();
   }catch(e){setAccountError(e.message);}finally{setAuthBusy(false);}
 }
 
 async function submitLogin(){
-  const email=(document.getElementById("authEmail")?.value||"").trim();
+  const identity=(document.getElementById("authIdentity")?.value||"").trim();
   const password=document.getElementById("authPassword")?.value||"";
-  if(!email||!password){setAccountError("Вкажіть e-mail і пароль.");return;}
+  if(!identity||!password){setAccountError("Вкажіть логін або e-mail і пароль.");return;}
   setAccountError("");setAuthBusy(true);
   try{
-    const result=await accountApi("login",{email,password});
+    const result=await accountApi("login",{identity,password});
     if(!result.ok)throw new Error(result.error||"Не вдалося увійти");
-    sessionToken=result.token||"";currentUser=result.user||null;
-    localStorage.setItem("bookingSessionToken",sessionToken);
-    if(currentUser?.theme)applyTheme(currentUser.theme);
-    updateAccountButton();refreshMessageBadge();renderAccountCabinet();
+    sessionToken=result.token||"";currentUser=result.user||null;localStorage.setItem("bookingSessionToken",sessionToken);
+    if(currentUser?.theme)applyTheme(currentUser.theme);updateAccountButton();refreshMessageBadge();renderAccountCabinet();
   }catch(e){setAccountError(e.message);}finally{setAuthBusy(false);}
 }
 
@@ -871,7 +869,7 @@ async function submitPasswordReset(){
     sessionToken="";currentUser=null;registeredUsersCache=[];messagesCache=[];
     localStorage.removeItem("bookingSessionToken");
     renderAuthModal("login");
-    const emailEl=document.getElementById("authEmail");if(emailEl)emailEl.value=email;
+    const identityEl=document.getElementById("authIdentity");if(identityEl)identityEl.value=email;
     alert(result.message||"Пароль успішно змінено. Увійдіть із новим паролем.");
   }catch(e){setAccountError(e.message);}finally{setAuthBusy(false);}
 }
@@ -886,23 +884,16 @@ async function fetchRegisteredUsers(force=false){
 }
 
 async function loadRegisteredUsersIntoCabinet(){
-  const box=document.getElementById("registeredUsersList");
-  const count=document.getElementById("registeredUsersCount");
-  if(!box)return;
+  const box=document.getElementById("registeredUsersList");const count=document.getElementById("registeredUsersCount");if(!box)return;
   box.innerHTML='<div class="directory-loading">Завантаження користувачів…</div>';
   try{
-    const users=await fetchRegisteredUsers(true);
-    if(count)count.textContent=String(users.length);
+    const users=await fetchRegisteredUsers(true);if(count)count.textContent=String(users.length);
     if(!users.length){box.innerHTML='<div class="directory-empty">Зареєстрованих користувачів поки немає.</div>';return;}
     box.innerHTML=users.map(u=>{
-      const isMe=(u.email||"").toLowerCase()===(currentUser?.email||"").toLowerCase();
-      const created=u.createdAt?`Реєстрація: ${escapeHtml(u.createdAt)}`:"";
-      const last=u.lastLoginAt?` · Вхід: ${escapeHtml(u.lastLoginAt)}`:"";
-      return `<div class="user-entry"><div><div class="user-entry-email">${escapeHtml(u.email||"")}</div><div class="user-entry-meta">${created}${last}</div></div>${isMe?'<span class="user-entry-you">Ви</span>':''}</div>`;
+      const isMe=(u.login||"").toLowerCase()===(currentUser?.login||"").toLowerCase();
+      return `<div class="user-entry"><div><div class="user-entry-email">@${escapeHtml(u.login||"")}</div></div>${isMe?'<span class="user-entry-you">Ви</span>':''}</div>`;
     }).join("");
-  }catch(e){
-    box.innerHTML=`<div class="directory-empty">Не вдалося завантажити користувачів.<br>${escapeHtml(e.message)}</div>`;
-  }
+  }catch(e){box.innerHTML=`<div class="directory-empty">Не вдалося завантажити користувачів.<br>${escapeHtml(e.message)}</div>`;}
 }
 
 async function fetchMessages(force=false){
@@ -942,7 +933,7 @@ async function loadMessagesIntoCabinet(){
     if(!items.length){box.innerHTML='<div class="directory-empty">Повідомлень поки немає.</div>';return;}
     box.innerHTML=items.map(m=>{
       const st=messageStatusInfo(m.status);const incoming=m.direction==="incoming";
-      const party=incoming?`Від: ${escapeHtml(m.fromEmail||"користувач")}`:`Кому: ${escapeHtml(m.toEmail||"користувач")}`;
+      const party=incoming?`Від: @${escapeHtml(m.fromLogin||"користувач")}`:`Кому: @${escapeHtml(m.toLogin||"користувач")}`;
       const actions=m.canRespond?`<div class="message-actions"><button type="button" onclick="respondDeleteMessage('${escapeAttr(m.id)}','decline')">Відхилити</button><button class="danger" type="button" onclick="respondDeleteMessage('${escapeAttr(m.id)}','approve')">Видалити бронювання</button></div>`:"";
       return `<div class="message-card ${st.cls}"><div class="message-top"><div><div class="message-kind">${incoming?"Запит на видалення":"Ваш запит на видалення"}</div><div class="message-meta">${party} · ${escapeHtml(m.createdAt||"")}</div></div><span class="message-status ${st.cls}">${st.label}</span></div><div class="message-booking"><b>${escapeHtml(m.meeting||"Бронювання")}</b>${formatHistoryDate(m.date)} · ${escapeHtml(m.start||"")}–${escapeHtml(m.end||"")} · ${escapeHtml(m.room||"")}</div>${m.text?`<div class="message-text">${escapeHtml(m.text)}</div>`:""}${actions}</div>`;
     }).join("");
@@ -964,26 +955,12 @@ function renderAccountCabinet(){
   if(!currentUser){renderAuthModal("login");return;}
   const dark=currentUser.theme==="dark";
   const body=`
-    <div class="account-card">
-      <div class="account-email">${escapeHtml(currentUser.email||"")}</div>
-      <div class="account-caption">Ваш особистий кабінет</div>
-    </div>
-    <div class="setting-row">
-      <div><div class="setting-title">Темна тема</div><div class="setting-sub">Налаштування зберігається у вашому профілі</div></div>
-      <label class="theme-switch" title="Світла / темна тема"><input id="themeToggle" type="checkbox" ${dark?"checked":""} onchange="changeAccountTheme(this.checked)"><span class="theme-slider"></span></label>
-    </div>
-    <div class="messages-section">
-      <div class="messages-head"><div class="messages-title">Повідомлення</div><span class="messages-count" id="cabinetMessagesCount">…</span></div>
-      <div class="messages-list" id="cabinetMessages"><div class="directory-loading">Завантаження повідомлень…</div></div>
-    </div>
-    <div class="user-directory">
-      <div class="user-directory-head"><div class="user-directory-title">Зареєстровані користувачі</div><span class="user-directory-count" id="registeredUsersCount">…</span></div>
-      <div class="user-directory-list" id="registeredUsersList"><div class="directory-loading">Завантаження користувачів…</div></div>
-    </div>
-    <div class="account-error" id="accountError"></div>
-    <button class="account-logout" type="button" onclick="logoutAccount()">Вийти з кабінету</button>`;
-  modalShell("Власний кабінет","Профіль, повідомлення, тема та користувачі",body);
-  loadMessagesIntoCabinet();loadRegisteredUsersIntoCabinet();
+    <div class="account-card"><div class="account-email">@${escapeHtml(currentUser.login||"")}</div><div class="account-caption">Ваш логін у розкладі. E-mail зберігається приватно та використовується лише для відновлення пароля і сповіщень.</div></div>
+    <div class="setting-row"><div><div class="setting-title">Темна тема</div><div class="setting-sub">Налаштування зберігається у вашому профілі</div></div><label class="theme-switch" title="Світла / темна тема"><input id="themeToggle" type="checkbox" ${dark?"checked":""} onchange="changeAccountTheme(this.checked)"><span class="theme-slider"></span></label></div>
+    <div class="messages-section"><div class="messages-head"><div class="messages-title">Запити щодо бронювань</div><span class="messages-count" id="cabinetMessagesCount">…</span></div><div class="messages-list" id="cabinetMessages"><div class="directory-loading">Завантаження повідомлень…</div></div></div>
+    <div class="user-directory"><div class="user-directory-head"><div class="user-directory-title">Користувачі</div><span class="user-directory-count" id="registeredUsersCount">…</span></div><div class="user-directory-list" id="registeredUsersList"><div class="directory-loading">Завантаження користувачів…</div></div></div>
+    <div class="account-error" id="accountError"></div><button class="account-logout" type="button" onclick="logoutAccount()">Вийти з кабінету</button>`;
+  modalShell("Власний кабінет","Профіль, запити, тема та користувачі",body);loadMessagesIntoCabinet();loadRegisteredUsersIntoCabinet();
 }
 
 async function changeAccountTheme(isDark){
@@ -1217,8 +1194,8 @@ function roomByName(name){return rooms.find(r=>r.name===name);}
 
 function slotClick(roomName,ds,t,e){
 if(e.classList.contains('un'))return;
-let room=roomByName(roomName);
-openBookingModal({mode:"create",room,ds,t});
+if(!currentUser||!sessionToken){openAccount("login");return;}
+let room=roomByName(roomName);openBookingModal({mode:"create",room,ds,t});
 }
 
 function openEditModal(roomName,ds,startTime){
@@ -1236,15 +1213,11 @@ function inviteUsersMarkup(){
 }
 
 async function populateInviteUsers(){
-  const box=document.getElementById("inviteUsers");
-  if(!box||!currentUser)return;
+  const box=document.getElementById("inviteUsers");if(!box||!currentUser)return;
   try{
-    const users=await fetchRegisteredUsers();
-    const me=(currentUser.email||"").toLowerCase();
-    const invitees=users.filter(u=>(u.email||"").toLowerCase()!==me);
+    const users=await fetchRegisteredUsers();const me=(currentUser.login||"").toLowerCase();const invitees=users.filter(u=>(u.login||"").toLowerCase()!==me);
     if(!invitees.length){box.innerHTML='<div class="directory-empty" style="grid-column:1/-1">Немає інших зареєстрованих користувачів.</div>';return;}
-    box.innerHTML=invitees.map(u=>`<label class="invite-user" title="${escapeAttr(u.email||"")}"><input class="invite-check" type="checkbox" value="${escapeAttr(u.email||"")}" onchange="updateInviteCount()"><span>${escapeHtml(u.email||"")}</span></label>`).join("");
-    updateInviteCount();
+    box.innerHTML=invitees.map(u=>`<label class="invite-user" title="@${escapeAttr(u.login||"")}"><input class="invite-check" type="checkbox" value="${escapeAttr(u.login||"")}" onchange="updateInviteCount()"><span>@${escapeHtml(u.login||"")}</span></label>`).join("");updateInviteCount();
   }catch(e){box.innerHTML=`<div class="directory-empty" style="grid-column:1/-1">${escapeHtml(e.message)}</div>`;}
 }
 
@@ -1258,13 +1231,13 @@ function selectedInvitees(){
 }
 
 function isBookingMine(b){
-  return !!(b&&b.ownerRegistered&&currentUser&&b.ownerEmail&&String(b.ownerEmail).toLowerCase()===String(currentUser.email||"").toLowerCase());
+  return !!(b&&b.ownerRegistered&&currentUser&&b.ownerLogin&&String(b.ownerLogin).toLowerCase()===String(currentUser.login||"").toLowerCase());
 }
 
 function openProtectedBookingModal(cfg){
   const b=cfg.booking,room=cfg.room,ds=cfg.ds;
   const logged=!!(currentUser&&sessionToken);
-  modalRoot.innerHTML=`<div class="overlay" id="ov"><div class="modal" id="modalBox"><h3>${escapeHtml(b.name||"Бронювання")}</h3><div class="protected-card"><div class="protected-row"><span>Кімната</span><b>${escapeHtml(room.name)}</b></div><div class="protected-row"><span>Дата</span><b>${formatHistoryDate(ds)}</b></div><div class="protected-row"><span>Час</span><b>${escapeHtml(b.startTime)}–${escapeHtml(endOfBooking(b))}</b></div><div class="protected-row"><span>Автор</span><b>${escapeHtml(b.author||b.ownerEmail||"—")}</b></div></div><div class="protected-note">Це бронювання створив зареєстрований користувач. Редагувати або видаляти його може тільки власник.</div>${logged?`<label>Повідомлення власнику</label><textarea class="request-text" id="deleteRequestText" maxlength="500">Прошу видалити це бронювання.</textarea>`:`<div class="protected-note">Щоб надіслати власнику запит на видалення, увійдіть у власний кабінет.</div>`}<div class="err" id="mErr"></div><div class="row"><button type="button" onclick="closeModal()">Закрити</button>${logged?`<button class="danger" type="button" onclick="submitDeleteRequest()">Надіслати запит</button>`:`<button class="primary" type="button" onclick="closeModal();openAccount('login')">Увійти</button>`}</div></div></div>`;
+  modalRoot.innerHTML=`<div class="overlay" id="ov"><div class="modal" id="modalBox"><h3>${escapeHtml(b.name||"Бронювання")}</h3><div class="protected-card"><div class="protected-row"><span>Кімната</span><b>${escapeHtml(room.name)}</b></div><div class="protected-row"><span>Дата</span><b>${formatHistoryDate(ds)}</b></div><div class="protected-row"><span>Час</span><b>${escapeHtml(b.startTime)}–${escapeHtml(endOfBooking(b))}</b></div><div class="protected-row"><span>Автор</span><b>${escapeHtml(b.author||b.ownerLogin||"—")}</b></div></div><div class="protected-note">Це бронювання створив зареєстрований користувач. Редагувати або видаляти його може тільки власник.</div>${logged?`<label>Повідомлення власнику</label><textarea class="request-text" id="deleteRequestText" maxlength="500">Прошу видалити це бронювання.</textarea>`:`<div class="protected-note">Щоб надіслати власнику запит на видалення, увійдіть у власний кабінет.</div>`}<div class="err" id="mErr"></div><div class="row"><button type="button" onclick="closeModal()">Закрити</button>${logged?`<button class="danger" type="button" onclick="submitDeleteRequest()">Надіслати запит</button>`:`<button class="primary" type="button" onclick="closeModal();openAccount('login')">Увійти</button>`}</div></div></div>`;
   window._modalCtx={mode:"protected",room,ds,originalStart:b.startTime,booking:b};
   document.getElementById('ov').addEventListener('mousedown',ev=>{if(ev.target.id==='ov')closeModal();});document.addEventListener('keydown',escCloseHandler);
 }
@@ -1281,61 +1254,18 @@ async function submitDeleteRequest(){
 }
 
 function openBookingModal(cfg){
+if(!currentUser||!sessionToken){openAccount("login");return;}
 if(cfg.mode==="edit"&&cfg.booking&&cfg.booking.ownerRegistered&&!isBookingMine(cfg.booking)){openProtectedBookingModal(cfg);return;}
-let room=cfg.room,ds=cfg.ds,t=cfg.t;
-let excludeStart=cfg.mode==="edit"?cfg.booking.startTime:null;
-let startOpts=availableStartOptions(room,ds,excludeStart);
-if(!startOpts.includes(t))startOpts.push(t);
-startOpts.sort((a,b)=>times.indexOf(a)-times.indexOf(b));
-let opts=availableEndOptions(room,ds,t,excludeStart);
-let currentEnd=cfg.mode==="edit"?endOfBooking(cfg.booking):(opts[0]||endTimeAfter(t));
-if(cfg.mode==="edit" && !opts.includes(currentEnd))opts.push(currentEnd);
+let room=cfg.room,ds=cfg.ds,t=cfg.t;let excludeStart=cfg.mode==="edit"?cfg.booking.startTime:null;
+let startOpts=availableStartOptions(room,ds,excludeStart);if(!startOpts.includes(t))startOpts.push(t);startOpts.sort((a,b)=>times.indexOf(a)-times.indexOf(b));
+let opts=availableEndOptions(room,ds,t,excludeStart);let currentEnd=cfg.mode==="edit"?endOfBooking(cfg.booking):(opts[0]||endTimeAfter(t));if(cfg.mode==="edit"&&!opts.includes(currentEnd))opts.push(currentEnd);
 let name=cfg.mode==="edit"?cfg.booking.name:"";
-let author=cfg.mode==="edit"?(cfg.booking.author||""):(currentUser&&currentUser.email?currentUser.email:"");
-
-let startOptsHtml=startOpts.map(o=>`<option value="${o}" ${o===t?"selected":""}>${o}</option>`).join("");
-let optsHtml=opts.map(o=>`<option value="${o}" ${o===currentEnd?"selected":""}>${o}</option>`).join("");
-let title=cfg.mode==="edit"?`Редагування: ${room.name}`:`Бронювання: ${room.name}`;
-let deleteBtn=cfg.mode==="edit"?`<button class="danger" type="button" onclick="submitDelete()">Видалити</button>`:"";
-let saveLabel=cfg.mode==="edit"?"Зберегти":"Забронювати";
-
-modalRoot.innerHTML=`
-<div class="overlay" id="ov">
-  <div class="modal" id="modalBox">
-    <h3>${title}</h3>
-    <label>Час початку</label>
-    <select id="mStart">${startOptsHtml}</select>
-    <label>Час завершення</label>
-    <select id="mEnd">${optsHtml}</select>
-    <label>Назва зустрічі</label>
-    <input id="mName" value="${escapeAttr(name)}" placeholder="напр. Нарада з відділом продажів">
-    <label>Автор (необов'язково)</label>
-    <input id="mAuthor" value="${escapeAttr(author)}" placeholder="напр. Дмитро Северин">
-    ${inviteUsersMarkup()}
-    <div class="err" id="mErr"></div>
-    <div class="row">
-      <button type="button" onclick="closeModal()">Скасувати</button>
-      ${deleteBtn}
-      <button class="primary" type="button" onclick="submitBooking()">${saveLabel}</button>
-    </div>
-  </div>
-</div>`;
-
+let startOptsHtml=startOpts.map(o=>`<option value="${o}" ${o===t?"selected":""}>${o}</option>`).join("");let optsHtml=opts.map(o=>`<option value="${o}" ${o===currentEnd?"selected":""}>${o}</option>`).join("");
+let title=cfg.mode==="edit"?`Редагування: ${room.name}`:`Бронювання: ${room.name}`;let deleteBtn=cfg.mode==="edit"?`<button class="danger" type="button" onclick="submitDelete()">Видалити</button>`:"";let saveLabel=cfg.mode==="edit"?"Зберегти":"Забронювати";
+modalRoot.innerHTML=`<div class="overlay" id="ov"><div class="modal" id="modalBox"><h3>${title}</h3><label>Час початку</label><select id="mStart">${startOptsHtml}</select><label>Час завершення</label><select id="mEnd">${optsHtml}</select><label>Назва зустрічі</label><input id="mName" maxlength="120" value="${escapeAttr(name)}" placeholder="напр. Нарада з відділом продажів"><div class="protected-card" style="margin-top:12px"><div class="protected-row"><span>Організатор</span><b>@${escapeHtml(currentUser.login||"")}</b></div></div>${inviteUsersMarkup()}<div class="err" id="mErr"></div><div class="row"><button type="button" onclick="closeModal()">Скасувати</button>${deleteBtn}<button class="primary" type="button" onclick="submitBooking()">${saveLabel}</button></div></div></div>`;
 window._modalCtx={mode:cfg.mode,room,ds,t,originalStart:excludeStart,booking:cfg.booking||null};
-
-document.getElementById('mStart').addEventListener('change',ev=>{
-let newStart=ev.target.value;
-let newOpts=availableEndOptions(room,ds,newStart,excludeStart);
-let mEnd=document.getElementById('mEnd');
-mEnd.innerHTML=newOpts.map(o=>`<option value="${o}">${o}</option>`).join("");
-document.getElementById('mErr').innerText="";
-});
-
-document.getElementById('mName').focus();
-populateInviteUsers();
-document.getElementById('ov').addEventListener('mousedown',ev=>{if(ev.target.id==='ov')closeModal();});
-document.addEventListener('keydown',escCloseHandler);
-document.getElementById('mName').addEventListener('keydown',ev=>{if(ev.key==='Enter')submitBooking();});
+document.getElementById('mStart').addEventListener('change',ev=>{let newStart=ev.target.value;let newOpts=availableEndOptions(room,ds,newStart,excludeStart);let mEnd=document.getElementById('mEnd');mEnd.innerHTML=newOpts.map(o=>`<option value="${o}">${o}</option>`).join("");document.getElementById('mErr').innerText="";});
+document.getElementById('mName').focus();populateInviteUsers();document.getElementById('ov').addEventListener('mousedown',ev=>{if(ev.target.id==='ov')closeModal();});document.addEventListener('keydown',escCloseHandler);document.getElementById('mName').addEventListener('keydown',ev=>{if(ev.key==='Enter')submitBooking();});
 }
 
 function escCloseHandler(ev){
@@ -1365,52 +1295,21 @@ async function submitDelete(){
     start:b.startTime,
     end:endOfBooking(b),
     name:b.name,
-    author:b.author||""
+    author:currentUser?.login||b.author||""
   });
   if(ok){closeModal();draw();}
 }
 
 
 async function submitBooking(){
-  const ctx=window._modalCtx;
-  if(!ctx)return;
-  const room=ctx.room, ds=ctx.ds;
-  const t=document.getElementById('mStart').value;
-  const endStr=document.getElementById('mEnd').value;
-  const name=document.getElementById('mName').value.trim();
-  const author=document.getElementById('mAuthor').value.trim();
-  const errEl=document.getElementById('mErr');
-
+  const ctx=window._modalCtx;if(!ctx)return;if(!currentUser||!sessionToken){closeModal();openAccount("login");return;}
+  const room=ctx.room,ds=ctx.ds;const t=document.getElementById('mStart').value;const endStr=document.getElementById('mEnd').value;const name=document.getElementById('mName').value.trim();const errEl=document.getElementById('mErr');
   if(!name){errEl.innerText="Вкажіть назву зустрічі.";return;}
-
-  const bnds=boundaries();
-  const startIdx=bnds.indexOf(t);
-  const endIdx=bnds.indexOf(endStr);
-  if(endIdx===-1||endIdx<=startIdx){errEl.innerText="Невірний час завершення.";return;}
-  const range=times.slice(startIdx,endIdx);
-  for(const rt of range){
-    if(isBlocked(room,ds,rt,ctx.originalStart)){
-      errEl.innerText="У вибраному проміжку є зайняті або недоступні слоти.";
-      return;
-    }
-  }
-
-  const action=ctx.mode==="edit"?"update":"create";
-  const old=ctx.mode==="edit"?bookings[key(room.name,ds,ctx.originalStart)]:null;
-  const payload={
-    id:old&&old.id?old.id:null,
-    room:room.name,
-    date:ds,
-    start:t,
-    end:endStr,
-    slots:range.length,
-    name,
-    author:author||"",
-    invitees:selectedInvitees()
-  };
-
-  const ok=await apiAction(action,payload);
-  if(ok){closeModal();draw();}
+  const bnds=boundaries(),startIdx=bnds.indexOf(t),endIdx=bnds.indexOf(endStr);if(endIdx===-1||endIdx<=startIdx){errEl.innerText="Невірний час завершення.";return;}
+  const range=times.slice(startIdx,endIdx);for(const rt of range){if(isBlocked(room,ds,rt,ctx.originalStart)){errEl.innerText="У вибраному проміжку є зайняті або недоступні слоти.";return;}}
+  const action=ctx.mode==="edit"?"update":"create";const old=ctx.mode==="edit"?bookings[key(room.name,ds,ctx.originalStart)]:null;
+  const payload={id:old&&old.id?old.id:null,room:room.name,date:ds,start:t,end:endStr,slots:range.length,name,author:currentUser.login||"",invitees:selectedInvitees()};
+  const ok=await apiAction(action,payload);if(ok){closeModal();draw();}
 }
 
 
