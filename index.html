@@ -209,11 +209,8 @@ button{background:linear-gradient(180deg,var(--surface-strong),var(--surface-sof
 body[data-theme="dark"] .account-logout{color:#ff9d9d!important}
 body[data-theme="dark"] .history-badge{filter:saturate(.85) brightness(.92)}
 
-.user-directory{margin-top:14px;border-top:1px solid var(--border);padding-top:14px}
-.user-directory-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
-.user-directory-title{font-weight:750}
-.user-directory-count{font-size:11px;color:var(--muted);padding:4px 8px;border-radius:999px;background:var(--surface-soft);border:1px solid var(--border)}
-.user-directory-list{max-height:220px;overflow:auto;display:grid;gap:7px;padding-right:2px}
+.user-directory{margin-top:10px}
+.user-directory-list{max-height:230px;overflow:auto;display:grid;gap:7px;padding-right:3px;scrollbar-gutter:stable}
 .user-entry{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 10px;border:1px solid var(--border);border-radius:11px;background:var(--surface-soft);box-shadow:var(--shadow-inset)}
 .user-entry-email{font-size:12px;font-weight:700;overflow-wrap:anywhere}
 .user-entry-meta{font-size:10px;color:var(--muted);margin-top:2px}
@@ -236,10 +233,20 @@ body[data-theme="dark"] .history-badge{filter:saturate(.85) brightness(.92)}
 .account-btn{position:relative}
 .message-badge{position:absolute;right:-6px;top:-7px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;display:grid;place-items:center;font-size:10px;font-weight:800;background:#e04444;color:#fff;border:2px solid var(--surface);box-shadow:0 4px 10px rgba(123,21,21,.3)}
 .message-badge[hidden]{display:none!important}
-.messages-section{margin-top:14px;border-top:1px solid var(--border);padding-top:14px}
-.messages-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
-.messages-title{font-weight:750}.messages-count{font-size:11px;color:var(--muted);padding:4px 8px;border-radius:999px;background:var(--surface-soft);border:1px solid var(--border)}
-.messages-list{display:grid;gap:9px;max-height:300px;overflow:auto;padding-right:2px}
+.messages-section{margin-top:14px}
+.cabinet-collapse{border:1px solid var(--border);border-radius:14px;background:var(--surface-soft);box-shadow:var(--shadow-inset);overflow:hidden}
+.cabinet-collapse+.cabinet-collapse{margin-top:10px}
+.cabinet-collapse>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 13px;cursor:pointer;font-weight:750;color:var(--text);user-select:none}
+.cabinet-collapse>summary::-webkit-details-marker{display:none}
+.cabinet-collapse>summary:after{content:"⌄";font-size:16px;color:var(--muted);transition:transform .18s ease}
+.cabinet-collapse[open]>summary:after{transform:rotate(180deg)}
+.cabinet-summary-main{display:flex;align-items:center;gap:8px;min-width:0}
+.cabinet-summary-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cabinet-collapse-body{border-top:1px solid var(--border);padding:10px 11px 11px}
+.messages-count,.user-directory-count{font-size:11px;color:var(--muted);padding:4px 8px;border-radius:999px;background:var(--surface);border:1px solid var(--border);white-space:nowrap}
+.messages-toolbar{display:flex;justify-content:flex-end;margin-bottom:9px}
+.messages-history-btn{padding:7px 10px!important;font-size:11px!important}
+.messages-list{display:grid;gap:9px;max-height:280px;overflow:auto;padding-right:3px;scrollbar-gutter:stable}
 .message-card{padding:12px;border:1px solid var(--border);border-radius:13px;background:var(--surface-soft);box-shadow:var(--shadow-inset)}
 .message-card.pending{border-color:rgba(227,157,52,.48)}
 .message-card.approved{border-color:rgba(43,158,100,.42)}
@@ -253,6 +260,12 @@ body[data-theme="dark"] .history-badge{filter:saturate(.85) brightness(.92)}
 .message-booking{margin-top:9px;font-size:12px;line-height:1.4}.message-booking b{display:block;font-size:13px;margin-bottom:2px}
 .message-text{margin-top:8px;padding:8px 9px;border-radius:9px;background:var(--surface);border:1px solid var(--border);font-size:11px;line-height:1.4;color:var(--muted)}
 .message-actions{display:flex;gap:7px;margin-top:9px}.message-actions button{flex:1;padding:7px 8px;font-size:11px}
+.message-history-modal{width:min(780px,96vw);padding:0;overflow:hidden;max-height:88vh;display:flex;flex-direction:column}
+.message-history-list{padding:12px 16px;overflow:auto;display:grid;gap:9px;min-height:0;max-height:calc(88vh - 150px);scrollbar-gutter:stable}
+.message-history-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-top:1px solid var(--border);background:var(--surface-soft)}
+.message-history-note{font-size:11px;color:var(--muted)}
+.message-history-footer button{white-space:nowrap}
+@media(max-width:560px){.message-history-footer{align-items:stretch;flex-direction:column}.message-history-footer button{width:100%}}
 .protected-card{padding:13px;border:1px solid var(--border);border-radius:13px;background:var(--surface-soft);box-shadow:var(--shadow-inset);margin-bottom:12px}
 .protected-row{display:grid;grid-template-columns:92px 1fr;gap:8px;font-size:12px;padding:4px 0}.protected-row span:first-child{color:var(--muted)}
 .protected-note{padding:10px 11px;border-radius:11px;background:rgba(39,131,190,.09);border:1px solid rgba(52,154,212,.22);font-size:11px;line-height:1.45;margin:10px 0}
@@ -968,6 +981,13 @@ function messageKindLabel(m){
   return incoming?"Запит на видалення":"Ваш запит на видалення";
 }
 
+function renderMessageCard(m,allowActions=true){
+  const st=messageStatusInfo(m.status,m.type);const incoming=m.direction==="incoming";
+  const party=incoming?`Від: @${escapeHtml(m.fromLogin||"користувач")}`:`Кому: @${escapeHtml(m.toLogin||"користувач")}`;
+  const actions=allowActions&&m.canRespond?`<div class="message-actions"><button type="button" onclick="respondDeleteMessage('${escapeAttr(m.id)}','decline')">Відхилити</button><button class="danger" type="button" onclick="respondDeleteMessage('${escapeAttr(m.id)}','approve')">Видалити бронювання</button></div>`:"";
+  return `<div class="message-card ${st.cls}"><div class="message-top"><div><div class="message-kind">${messageKindLabel(m)}</div><div class="message-meta">${party} · ${escapeHtml(m.createdAt||"")}</div></div><span class="message-status ${st.cls}">${st.label}</span></div><div class="message-booking"><b>${escapeHtml(m.meeting||"Бронювання")}</b>${formatHistoryDate(m.date)} · ${escapeHtml(m.start||"")}–${escapeHtml(m.end||"")} · ${escapeHtml(m.room||"")}</div>${m.text?`<div class="message-text">${escapeHtml(m.text)}</div>`:""}${actions}</div>`;
+}
+
 async function loadMessagesIntoCabinet(){
   const box=document.getElementById("cabinetMessages");const count=document.getElementById("cabinetMessagesCount");if(!box)return;
   box.innerHTML='<div class="directory-loading">Завантаження повідомлень…</div>';
@@ -975,12 +995,8 @@ async function loadMessagesIntoCabinet(){
     const r=await fetchMessages(true);const items=r.messages;setMessageBadge(r.pendingIncoming);
     if(count)count.textContent=String(items.length);
     if(!items.length){box.innerHTML='<div class="directory-empty">Повідомлень поки немає.</div>';return;}
-    box.innerHTML=items.map(m=>{
-      const st=messageStatusInfo(m.status,m.type);const incoming=m.direction==="incoming";
-      const party=incoming?`Від: @${escapeHtml(m.fromLogin||"користувач")}`:`Кому: @${escapeHtml(m.toLogin||"користувач")}`;
-      const actions=m.canRespond?`<div class="message-actions"><button type="button" onclick="respondDeleteMessage('${escapeAttr(m.id)}','decline')">Відхилити</button><button class="danger" type="button" onclick="respondDeleteMessage('${escapeAttr(m.id)}','approve')">Видалити бронювання</button></div>`:"";
-      return `<div class="message-card ${st.cls}"><div class="message-top"><div><div class="message-kind">${messageKindLabel(m)}</div><div class="message-meta">${party} · ${escapeHtml(m.createdAt||"")}</div></div><span class="message-status ${st.cls}">${st.label}</span></div><div class="message-booking"><b>${escapeHtml(m.meeting||"Бронювання")}</b>${formatHistoryDate(m.date)} · ${escapeHtml(m.start||"")}–${escapeHtml(m.end||"")} · ${escapeHtml(m.room||"")}</div>${m.text?`<div class="message-text">${escapeHtml(m.text)}</div>`:""}${actions}</div>`;
-    }).join("");
+    box.innerHTML=items.slice(0,10).map(m=>renderMessageCard(m,true)).join("");
+    if(items.length>10)box.insertAdjacentHTML("beforeend",`<div class="directory-empty">Показано 10 найновіших із ${items.length}. Повну історію відкрийте кнопкою «Історія повідомлень».</div>`);
     if(items.some(m=>m.direction==="incoming"&&m.status==="NEW"&&["BOOKING_INVITE","BOOKING_UPDATE","BOOKING_CANCELLED"].includes(String(m.type||"").toUpperCase()))){
       try{
         const readResult=await accountApi("mark_messages_read",{token:sessionToken});
@@ -1007,8 +1023,18 @@ function renderAccountCabinet(){
   const body=`
     <div class="account-card"><div class="account-email">@${escapeHtml(currentUser.login||"")}</div><div class="account-caption">Ваш логін у розкладі. E-mail зберігається приватно та використовується лише для відновлення пароля і сповіщень.</div></div>
     <div class="setting-row"><div><div class="setting-title">Темна тема</div><div class="setting-sub">Налаштування зберігається у вашому профілі</div></div><label class="theme-switch" title="Світла / темна тема"><input id="themeToggle" type="checkbox" ${dark?"checked":""} onchange="changeAccountTheme(this.checked)"><span class="theme-slider"></span></label></div>
-    <div class="messages-section"><div class="messages-head"><div class="messages-title">Повідомлення та запрошення</div><span class="messages-count" id="cabinetMessagesCount">…</span></div><div class="messages-list" id="cabinetMessages"><div class="directory-loading">Завантаження повідомлень…</div></div></div>
-    <div class="user-directory"><div class="user-directory-head"><div class="user-directory-title">Користувачі</div><span class="user-directory-count" id="registeredUsersCount">…</span></div><div class="user-directory-list" id="registeredUsersList"><div class="directory-loading">Завантаження користувачів…</div></div></div>
+    <div class="messages-section">
+      <details class="cabinet-collapse">
+        <summary><span class="cabinet-summary-main"><span>✉️</span><span class="cabinet-summary-title">Повідомлення та запрошення</span><span class="messages-count" id="cabinetMessagesCount">…</span></span></summary>
+        <div class="cabinet-collapse-body"><div class="messages-toolbar"><button class="messages-history-btn" type="button" onclick="openMessageHistory()">🕘 Історія повідомлень</button></div><div class="messages-list" id="cabinetMessages"><div class="directory-loading">Завантаження повідомлень…</div></div></div>
+      </details>
+    </div>
+    <div class="user-directory">
+      <details class="cabinet-collapse">
+        <summary><span class="cabinet-summary-main"><span>👥</span><span class="cabinet-summary-title">Учасники</span><span class="user-directory-count" id="registeredUsersCount">…</span></span></summary>
+        <div class="cabinet-collapse-body"><div class="user-directory-list" id="registeredUsersList"><div class="directory-loading">Завантаження учасників…</div></div></div>
+      </details>
+    </div>
     <div class="account-error" id="accountError"></div><button class="account-logout" type="button" onclick="logoutAccount()">Вийти з кабінету</button>`;
   modalShell("Власний кабінет","Профіль, повідомлення, тема та користувачі",body);loadMessagesIntoCabinet();loadRegisteredUsersIntoCabinet();
 }
@@ -1363,6 +1389,59 @@ async function submitBooking(){
 }
 
 
+
+function spreadsheetSafeText(value){
+  const s=String(value??"");
+  return /^[=+\-@]/.test(s)?"'"+s:s;
+}
+
+function messageTypeForExport(m){return messageKindLabel(m);}
+
+function messageDirectionForExport(m){return m?.direction==="incoming"?"Вхідне":"Вихідне";}
+
+function messageStatusForExport(m){return messageStatusInfo(m?.status,m?.type).label;}
+
+async function openMessageHistory(){
+  if(!currentUser||!sessionToken){openAccount("login");return;}
+  modalRoot.innerHTML=`
+  <div class="overlay" id="ov">
+    <div class="modal message-history-modal">
+      <div class="history-head">
+        <div><h3>Історія повідомлень</h3><div class="sub">Останні 10 повідомлень · нові зверху</div></div>
+        <button class="history-close" type="button" onclick="closeModal()" aria-label="Закрити">×</button>
+      </div>
+      <div class="message-history-list" id="messageHistoryList"><div class="history-loading">Завантаження повідомлень…</div></div>
+      <div class="message-history-footer"><div class="message-history-note" id="messageHistoryNote">Для повної історії скористайтеся вивантаженням.</div><button class="primary" type="button" onclick="exportAllMessagesToExcel()">⬇ Вивантажити в Excel</button></div>
+    </div>
+  </div>`;
+  window._modalCtx={mode:"message-history"};
+  document.getElementById('ov').addEventListener('mousedown',ev=>{if(ev.target.id==='ov')closeModal();});
+  document.addEventListener('keydown',escCloseHandler);
+  try{
+    const r=await fetchMessages(true);const all=Array.isArray(r.messages)?r.messages:[];const list=document.getElementById("messageHistoryList");
+    if(!all.length){list.innerHTML='<div class="history-empty">Історія повідомлень порожня.</div>';return;}
+    const shown=all.slice(0,10);
+    list.innerHTML=shown.map(m=>renderMessageCard(m,false)).join("");
+    const note=document.getElementById("messageHistoryNote");if(note)note.textContent=`Показано ${shown.length} із ${all.length}. Excel міститиме всю історію.`;
+  }catch(e){const list=document.getElementById("messageHistoryList");if(list)list.innerHTML=`<div class="history-empty">Не вдалося завантажити історію.<br><span style="font-size:11px">${escapeHtml(e.message)}</span></div>`;}
+}
+
+async function exportAllMessagesToExcel(){
+  if(!currentUser||!sessionToken){openAccount("login");return;}
+  const btn=document.querySelector('.message-history-footer .primary');
+  const oldText=btn?btn.textContent:"";if(btn){btn.disabled=true;btn.textContent="Формування…";}
+  try{
+    const r=await fetchMessages(true);const items=Array.isArray(r.messages)?r.messages:[];
+    if(!items.length){alert("Історія повідомлень порожня.");return;}
+    const escCell=v=>escapeHtml(spreadsheetSafeText(v)).replace(/\n/g,"<br>");
+    const rows=items.map(m=>`<tr><td>${escCell(m.createdAt)}</td><td>${escCell(messageDirectionForExport(m))}</td><td>${escCell(messageTypeForExport(m))}</td><td>${escCell(messageStatusForExport(m))}</td><td>${escCell(m.direction==="incoming"?m.fromLogin:m.toLogin)}</td><td>${escCell(m.meeting)}</td><td>${escCell(m.room)}</td><td>${escCell(formatHistoryDate(m.date))}</td><td>${escCell(m.start)}</td><td>${escCell(m.end)}</td><td>${escCell(m.text)}</td><td>${escCell(m.resolvedAt)}</td></tr>`).join("");
+    const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:11pt}th,td{border:1px solid #999;padding:5px;vertical-align:top}th{font-weight:bold;background:#eee}</style></head><body><table><thead><tr><th>Дата/час</th><th>Напрямок</th><th>Тип</th><th>Статус</th><th>Користувач</th><th>Нарада</th><th>Кімната</th><th>Дата наради</th><th>Початок</th><th>Кінець</th><th>Повідомлення</th><th>Опрацьовано</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+    const blob=new Blob(["\ufeff",html],{type:"application/vnd.ms-excel;charset=utf-8"});
+    const url=URL.createObjectURL(blob);const a=document.createElement("a");
+    const stamp=new Date().toISOString().slice(0,10);a.href=url;a.download=`message_history_${currentUser.login||"user"}_${stamp}.xls`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }catch(e){alert("Не вдалося вивантажити історію: "+e.message);}
+  finally{if(btn){btn.disabled=false;btn.textContent=oldText||"⬇ Вивантажити в Excel";}}
+}
 
 function historyActionInfo(action){
   const a=String(action||"").toUpperCase();
