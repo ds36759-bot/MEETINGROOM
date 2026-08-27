@@ -668,9 +668,16 @@ async function apiAction(action, booking){
     if(!result.ok) throw new Error(result.error||"Помилка сервера");
     bookings=result.bookings||{};
     if(result.invites&&result.invites.requested){
-      const sent=Number(result.invites.sent||0),failed=Number(result.invites.failed||0);
-      if(failed)alert(`Бронювання збережено. Запрошення: ${sent} надіслано, ${failed} не вдалося надіслати.`);
-      else alert(`Бронювання збережено. Запрошення надіслано: ${sent}.`);
+      const requested=Number(result.invites.requested||0);
+      const inApp=Number(result.invites.inAppSent||0);
+      const emailSent=Number(result.invites.emailSent||0);
+      const emailFailed=Number(result.invites.emailFailed||0);
+      const invalid=Number(result.invites.invalid||0);
+      const parts=[`У кабінет: ${inApp}/${requested}`,`На e-mail: ${emailSent}/${requested}`];
+      if(emailFailed)parts.push(`помилок e-mail: ${emailFailed}`);
+      if(invalid)parts.push(`не знайдено користувачів: ${invalid}`);
+      alert(`Бронювання збережено. Запрошення — ${parts.join("; ")}.`);
+      messagesCache=[];
     }
     return true;
   }catch(e){
@@ -918,7 +925,12 @@ async function loadRegisteredUsersIntoCabinet(){
 async function fetchMessages(force=false){
   if(!currentUser||!sessionToken)return {messages:[],pendingIncoming:0};
   if(messagesCache.length&&!force){
-    return {messages:messagesCache,pendingIncoming:messagesCache.filter(m=>m.direction==="incoming"&&m.status==="PENDING").length};
+    const pendingIncoming=messagesCache.filter(m=>{
+      if(m.direction!=="incoming")return false;
+      const t=String(m.type||"").toUpperCase(),s=String(m.status||"").toUpperCase();
+      return (t==="DELETE_REQUEST"&&s==="PENDING")||(["BOOKING_INVITE","BOOKING_UPDATE","BOOKING_CANCELLED"].includes(t)&&s==="NEW");
+    }).length;
+    return {messages:messagesCache,pendingIncoming};
   }
   const result=await accountApi("list_messages",{token:sessionToken});
   if(!result.ok)throw new Error(result.error||"Не вдалося завантажити повідомлення");
@@ -936,11 +948,24 @@ async function refreshMessageBadge(){
   try{const r=await fetchMessages(true);setMessageBadge(r.pendingIncoming);}catch(e){console.warn(e);}
 }
 
-function messageStatusInfo(status){
-  const s=String(status||"PENDING").toUpperCase();
+function messageStatusInfo(status,type){
+  const s=String(status||"").toUpperCase();
+  const t=String(type||"").toUpperCase();
+  if(t==="BOOKING_INVITE"||t==="BOOKING_UPDATE"||t==="BOOKING_CANCELLED"){
+    return s==="NEW"?{label:"Нове",cls:"pending"}:{label:"Переглянуто",cls:"approved"};
+  }
   if(s==="APPROVED")return {label:"Погоджено",cls:"approved"};
   if(s==="DECLINED")return {label:"Відхилено",cls:"declined"};
   return {label:"Очікує рішення",cls:"pending"};
+}
+
+function messageKindLabel(m){
+  const t=String(m?.type||"").toUpperCase();
+  const incoming=m?.direction==="incoming";
+  if(t==="BOOKING_INVITE")return incoming?"Запрошення на нараду":"Надіслане запрошення";
+  if(t==="BOOKING_UPDATE")return incoming?"Оновлення наради":"Надіслане оновлення";
+  if(t==="BOOKING_CANCELLED")return incoming?"Нараду скасовано":"Сповіщення про скасування";
+  return incoming?"Запит на видалення":"Ваш запит на видалення";
 }
 
 async function loadMessagesIntoCabinet(){
@@ -951,11 +976,17 @@ async function loadMessagesIntoCabinet(){
     if(count)count.textContent=String(items.length);
     if(!items.length){box.innerHTML='<div class="directory-empty">Повідомлень поки немає.</div>';return;}
     box.innerHTML=items.map(m=>{
-      const st=messageStatusInfo(m.status);const incoming=m.direction==="incoming";
+      const st=messageStatusInfo(m.status,m.type);const incoming=m.direction==="incoming";
       const party=incoming?`Від: @${escapeHtml(m.fromLogin||"користувач")}`:`Кому: @${escapeHtml(m.toLogin||"користувач")}`;
       const actions=m.canRespond?`<div class="message-actions"><button type="button" onclick="respondDeleteMessage('${escapeAttr(m.id)}','decline')">Відхилити</button><button class="danger" type="button" onclick="respondDeleteMessage('${escapeAttr(m.id)}','approve')">Видалити бронювання</button></div>`:"";
-      return `<div class="message-card ${st.cls}"><div class="message-top"><div><div class="message-kind">${incoming?"Запит на видалення":"Ваш запит на видалення"}</div><div class="message-meta">${party} · ${escapeHtml(m.createdAt||"")}</div></div><span class="message-status ${st.cls}">${st.label}</span></div><div class="message-booking"><b>${escapeHtml(m.meeting||"Бронювання")}</b>${formatHistoryDate(m.date)} · ${escapeHtml(m.start||"")}–${escapeHtml(m.end||"")} · ${escapeHtml(m.room||"")}</div>${m.text?`<div class="message-text">${escapeHtml(m.text)}</div>`:""}${actions}</div>`;
+      return `<div class="message-card ${st.cls}"><div class="message-top"><div><div class="message-kind">${messageKindLabel(m)}</div><div class="message-meta">${party} · ${escapeHtml(m.createdAt||"")}</div></div><span class="message-status ${st.cls}">${st.label}</span></div><div class="message-booking"><b>${escapeHtml(m.meeting||"Бронювання")}</b>${formatHistoryDate(m.date)} · ${escapeHtml(m.start||"")}–${escapeHtml(m.end||"")} · ${escapeHtml(m.room||"")}</div>${m.text?`<div class="message-text">${escapeHtml(m.text)}</div>`:""}${actions}</div>`;
     }).join("");
+    if(items.some(m=>m.direction==="incoming"&&m.status==="NEW"&&["BOOKING_INVITE","BOOKING_UPDATE","BOOKING_CANCELLED"].includes(String(m.type||"").toUpperCase()))){
+      try{
+        const readResult=await accountApi("mark_messages_read",{token:sessionToken});
+        if(readResult.ok){messagesCache=Array.isArray(readResult.messages)?readResult.messages:[];setMessageBadge(readResult.pendingIncoming||0);}
+      }catch(readErr){console.warn("Не вдалося позначити повідомлення прочитаними",readErr);}
+    }
   }catch(e){box.innerHTML=`<div class="directory-empty">Не вдалося завантажити повідомлення.<br>${escapeHtml(e.message)}</div>`;}
 }
 
@@ -976,10 +1007,10 @@ function renderAccountCabinet(){
   const body=`
     <div class="account-card"><div class="account-email">@${escapeHtml(currentUser.login||"")}</div><div class="account-caption">Ваш логін у розкладі. E-mail зберігається приватно та використовується лише для відновлення пароля і сповіщень.</div></div>
     <div class="setting-row"><div><div class="setting-title">Темна тема</div><div class="setting-sub">Налаштування зберігається у вашому профілі</div></div><label class="theme-switch" title="Світла / темна тема"><input id="themeToggle" type="checkbox" ${dark?"checked":""} onchange="changeAccountTheme(this.checked)"><span class="theme-slider"></span></label></div>
-    <div class="messages-section"><div class="messages-head"><div class="messages-title">Запити щодо бронювань</div><span class="messages-count" id="cabinetMessagesCount">…</span></div><div class="messages-list" id="cabinetMessages"><div class="directory-loading">Завантаження повідомлень…</div></div></div>
+    <div class="messages-section"><div class="messages-head"><div class="messages-title">Повідомлення та запрошення</div><span class="messages-count" id="cabinetMessagesCount">…</span></div><div class="messages-list" id="cabinetMessages"><div class="directory-loading">Завантаження повідомлень…</div></div></div>
     <div class="user-directory"><div class="user-directory-head"><div class="user-directory-title">Користувачі</div><span class="user-directory-count" id="registeredUsersCount">…</span></div><div class="user-directory-list" id="registeredUsersList"><div class="directory-loading">Завантаження користувачів…</div></div></div>
     <div class="account-error" id="accountError"></div><button class="account-logout" type="button" onclick="logoutAccount()">Вийти з кабінету</button>`;
-  modalShell("Власний кабінет","Профіль, запити, тема та користувачі",body);loadMessagesIntoCabinet();loadRegisteredUsersIntoCabinet();
+  modalShell("Власний кабінет","Профіль, повідомлення, тема та користувачі",body);loadMessagesIntoCabinet();loadRegisteredUsersIntoCabinet();
 }
 
 async function changeAccountTheme(isDark){
@@ -1228,7 +1259,7 @@ function inviteUsersMarkup(){
   if(!currentUser||!sessionToken){
     return `<div class="invite-box"><div class="invite-title">Запросити учасників</div><div class="invite-login">Увійдіть у власний кабінет, щоб обирати зареєстрованих користувачів і надсилати їм запрошення.</div></div>`;
   }
-  return `<div class="invite-box"><div class="invite-head"><div class="invite-title">Запросити зареєстрованих користувачів</div><div class="invite-count" id="inviteCount">0 обрано</div></div><div class="invite-users" id="inviteUsers"><div class="directory-loading">Завантаження…</div></div><div class="invite-note">Після збереження бронювання кожен обраний користувач отримає окремий e-mail із деталями наради.</div></div>`;
+  return `<div class="invite-box"><div class="invite-head"><div class="invite-title">Запросити зареєстрованих користувачів</div><div class="invite-count" id="inviteCount">0 обрано</div></div><div class="invite-users" id="inviteUsers"><div class="directory-loading">Завантаження…</div></div><div class="invite-note">Після збереження кожен обраний користувач отримає повідомлення в особистому кабінеті та окремий e-mail із деталями наради.</div></div>`;
 }
 
 async function populateInviteUsers(){
